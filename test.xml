@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<elements>
+    <tags Id="1" name="tags container">
+      <tag Id="1" name="app'le" />
+      <tag Id='2' />
+      <tag Id="3" name="kiwi" />
+    </tags>
+    <tags Id="2" name="tags container no 2">
+      <tag Id="4" name="kiwi 2" />
+    </tags>
+    <tags Id="3" name="tags container no 3">
+      <tag Id="5" name="juice" something="1" />
+      <tag Id="6" name="candy" />
+    </tags>
+</elements>
