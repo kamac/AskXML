@@ -1,19 +1,23 @@
-from typing import Dict
+from typing import List
 from .xml2sql import convert
-from .column import ColumnInfo
+from .table import Table
 import sqlite3
 import tempfile
 import os
 
 class AskXML():
-    def __init__(self, filename: str, column_annotations: Dict[str, Dict[str, ColumnInfo]] = None):
+    def __init__(self, filename: str, table_definitions: List[Table] = None,
+            persist_data: bool = True):
         """
         :param filename: Path to .xml file to open
-        :param column_annotations: A dictionary specifying column properties. First key is table name,
-            second is column name.
+        :param table_definitions: A list of table definitions
+        :param persist_data: If enabled, changes to data will be saved to source XML file
         """
+        self.persist_data = persist_data
+        self.filename = filename
+
         sql_file = tempfile.TemporaryFile(mode='w+')
-        convert(filename, sql_file, column_annotations)
+        convert(filename, sql_file, dict((table.table_name, table,) for table in table_definitions))
         sql_file.seek(0)
 
         handle, self.db_path = tempfile.mkstemp(suffix='.db')
@@ -23,18 +27,23 @@ class AskXML():
         # fill database with data
         c = self.__conn.cursor()
         for query in sql_file:
+            print(query)
             c.execute(query)
         self.__conn.commit()
         c.close()
         sql_file.close()
 
-    def save(self):
+    def synchronize(self):
         """
         Saves changes to source XML file
         """
         pass
 
     def close(self):
+        """
+        Closes connection to XML document
+        """
+        self.synchronize()
         self.__conn.close()
         os.remove(self.db_path)
 
