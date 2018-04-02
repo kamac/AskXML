@@ -1,14 +1,53 @@
 from typing import Dict, AbstractSet, List
-from . import column, table
+from abc import abstractmethod
+from askxml import column, table
+from .driver import Driver
 try:
     import lxml.etree as xml
 except ModuleNotFoundError:
     import xml.etree.cElementTree as xml
 import tempfile
+import os
+import sqlite3
+
+class SqliteDriver(Driver):
+    """
+    Sqlite Driver works by setting up a .sqlite copy of XML document,
+    and then running statements on it.
+    """
+    def __init__(self, filename: str, table_definitions):
+        sql_file = tempfile.TemporaryFile(mode='w+')
+        convert(filename, sql_file, dict((table.table_name, table,) for table in table_definitions))
+        sql_file.seek(0)
+
+        handle, self.db_path = tempfile.mkstemp(suffix='.db')
+        os.close(handle)
+
+        self._conn = sqlite3.connect(self.db_path)
+        # fill database with data
+        self._cursor = self._conn.cursor()
+        for query in sql_file:
+            self._cursor.execute(query)
+        self._conn.commit()
+        sql_file.close()
+
+    @property
+    def table_names(self) -> List[str]:
+        self._cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        result_set = self._cursor.fetchall()
+        return [r[0] for r in result_set]
+
+    def create_cursor(self):
+        return self._conn.cursor()
+
+    def close(self):
+        self._cursor.close()
+        self._conn.close()
+        os.remove(self.db_path)
 
 def convert(filename: str, outfile, table_definitions: Dict[str, table.Table] = None):
     """
-    Converts an XML file to a SQL script
+    Converts an XML file to a .sqlite script
 
     :param filename: Path to .xml file to open
     :param outfile: File handle where resulting .sql will be stored
