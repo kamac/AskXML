@@ -27,7 +27,9 @@ class AskXML:
         if not self.persist_data:
             return
 
-        print(self._driver.table_names)
+        #cursor = self._driver.create_cursor()
+        #print(self._driver.table_names)
+        raise NotImplementedError()
 
     def close(self):
         """
