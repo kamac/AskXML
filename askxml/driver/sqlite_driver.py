@@ -20,37 +20,46 @@ class SqliteDriver(Driver):
     # Name of the column that stores node's ID
     id_name = '_id'
 
-    def __init__(self, filename: str, table_definitions):
+    def __init__(self, filename: str, table_definitions, in_memory_db: bool = False):
+        """
+        :param filename: Path to .xml file to open
+        :param table_definitions: A dict of table name as keys table definitions as values
+        :param in_memory_db: If set to True, sqlite's database will be stored in RAM rather than as
+            a temporary file on disk.
+        """
         sql_file = tempfile.TemporaryFile(mode='w+')
-        Converter(filename, sql_file, table_definitions=dict((table.table_name, table,) for table in table_definitions),
+        converter = Converter(filename, sql_file, table_definitions=dict((table.table_name, table,) for table in table_definitions),
             join_name=self.join_name, id_name=self.id_name)
+        self._table_hierarchy = converter._table_hierarchy
         sql_file.seek(0)
 
-        handle, self.db_path = tempfile.mkstemp(suffix='.db')
-        os.close(handle)
+        if not in_memory_db:
+            handle, self.db_path = tempfile.mkstemp(suffix='.db')
+            os.close(handle)
+        else:
+            self.db_path = ':memory:'
 
         self._conn = sqlite3.connect(self.db_path)
         # fill database with data
-        self._cursor = self._conn.cursor()
+        cursor = self._conn.cursor()
         for query in sql_file:
             print(query)
-            self._cursor.execute(query)
+            cursor.execute(query)
+        cursor.close()
         self._conn.commit()
         sql_file.close()
 
     @property
-    def table_names(self) -> List[str]:
-        self._cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        result_set = self._cursor.fetchall()
-        return [r[0] for r in result_set]
+    def table_hierarchy(self) -> str:
+        return self._table_hierarchy
 
     def create_cursor(self):
         return self._conn.cursor()
 
     def close(self):
-        self._cursor.close()
         self._conn.close()
-        os.remove(self.db_path)
+        if self.db_path != ':memory:':
+            os.remove(self.db_path)
 
 class Converter:
     def __init__(self, filename: str, outfile, table_definitions: Dict[str, table.Table] = None,
@@ -74,7 +83,8 @@ class Converter:
         self.id_cache: Dict[str, int] = {}
         # a set of table names which tells us in a quick way
         # whether we've already altered a table with id & join id
-        self.generated_keys_cache: AbstractSet[str] = set()
+        self._generated_keys_cache: AbstractSet[str] = set()
+        self._table_hierarchy = {}
 
         self.xmliter = xml.iterparse(filename, events=("start", "end"))
         _, root = next(self.xmliter)
@@ -166,14 +176,24 @@ class Converter:
                 if not table_definition:
                     table_definition = table.Table(table_name)
                     self.table_definitions[table_name] = table_definition
-                if table_name not in self.generated_keys_cache:
-                    self.generated_keys_cache.add(table_name)
+                if table_name not in self._generated_keys_cache:
+                    self._generated_keys_cache.add(table_name)
                     # generate an id column
                     table_definition.column_definitions.append(column.Column(self.id_name, column.Integer()))
                     table_definition.constraint_definitions.append(column.PrimaryKey(self.id_name))
                     # generate a join column
                     table_definition.column_definitions.append(column.Column(self.join_name, column.Integer(),
                         column.ForeignKey(table_scope[:-1] + '.' + self.id_name)))
+
+                    if not table_scope:
+                        # this is a root table
+                        self._table_hierarchy[table_name] = {}
+                    else:
+                        table_path = table_name.split('_')
+                        last_item = None
+                        for tname in table_path[:-1]:
+                            last_item = self._table_hierarchy[tname]
+                        last_item[table_path[-1]] = {}
 
             column_values = []
             for column_name, value in node.attrib.items():

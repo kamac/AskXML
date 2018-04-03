@@ -6,7 +6,7 @@ import os
 
 class AskXML:
     def __init__(self, filename: str, table_definitions: List[Table] = None,
-            persist_data: bool = True, driver = 'sqlite'):
+            persist_data: bool = True, driver = 'sqlite', *args, **kwargs):
         """
         :param filename: Path to .xml file to open
         :param table_definitions: A list of table definitions
@@ -18,7 +18,7 @@ class AskXML:
         if not hasattr(driver, '__call__'):
             driver = getattr(import_module('askxml.driver.' + driver + '_driver'), driver.capitalize() + 'Driver')
 
-        self._driver = driver(filename, table_definitions)
+        self._driver = driver(filename, table_definitions, *args, **kwargs)
 
     def synchronize(self):
         """
@@ -27,9 +27,17 @@ class AskXML:
         if not self.persist_data:
             return
 
-        #cursor = self._driver.create_cursor()
-        #print(self._driver.table_names)
-        raise NotImplementedError()
+        cursor = self._driver.create_cursor()
+        try:
+            '''with open(self.filename + '_saved', 'w') as f:
+                for key, table_name in self._driver.table_hierarchy.items():
+                    result_set = cursor.execute("""SELECT * FROM {from_table} AS a
+                        INNER JOIN {parent_table} AS b ON a.{join_name} = b.{id_name}
+                        WHERE b.{id_name} = {parent_id}""".format(
+                            from_table = ))'''
+            pass
+        finally:
+            cursor.close()
 
     def close(self):
         """
