@@ -15,9 +15,15 @@ class SqliteDriver(Driver):
     Sqlite Driver works by setting up a .sqlite copy of XML document,
     and then running statements on it.
     """
+    # Name of the column that stores parent's ID
+    join_name = '_parentId'
+    # Name of the column that stores node's ID
+    id_name = '_id'
+
     def __init__(self, filename: str, table_definitions):
         sql_file = tempfile.TemporaryFile(mode='w+')
-        convert(filename, sql_file, dict((table.table_name, table,) for table in table_definitions))
+        Converter(filename, sql_file, table_definitions=dict((table.table_name, table,) for table in table_definitions),
+            join_name=self.join_name, id_name=self.id_name)
         sql_file.seek(0)
 
         handle, self.db_path = tempfile.mkstemp(suffix='.db')
@@ -27,6 +33,7 @@ class SqliteDriver(Driver):
         # fill database with data
         self._cursor = self._conn.cursor()
         for query in sql_file:
+            print(query)
             self._cursor.execute(query)
         self._conn.commit()
         sql_file.close()
@@ -45,105 +52,162 @@ class SqliteDriver(Driver):
         self._conn.close()
         os.remove(self.db_path)
 
-def convert(filename: str, outfile, table_definitions: Dict[str, table.Table] = None):
-    """
-    Converts an XML file to a .sqlite script
+class Converter:
+    def __init__(self, filename: str, outfile, table_definitions: Dict[str, table.Table] = None,
+        join_name: str = None, id_name: str = None):
+        """
+        Converts an XML file to a .sqlite script
 
-    :param filename: Path to .xml file to open
-    :param outfile: File handle where resulting .sql will be stored
-    :param table_definitions: A dict of table name as keys table definitions as values
-    """
-    xmliter = xml.iterparse(filename, events=("start", "end"))
-    _, root = next(xmliter)
-    # a dict that holds all found tables and their columns
-    tables: Dict[str, AbstractSet[str]] = {}
+        :param filename: Path to .xml file to open
+        :param outfile: File handle where resulting .sql will be stored
+        :param table_definitions: A dict of table name as keys table definitions as values
+        :param join_name: Name of the column that stores parent's ID. Set to None to not join.
+        :param id_name: Name of the column that stores node's ID. Set to None to not generate an ID.
+        """
+        if not table_definitions:
+            table_definitions = {}
 
-    # generate insert queries in a temporary file
-    inserts_file = tempfile.TemporaryFile(mode='w+')
-    __parseNode(root, xmliter, tables, inserts_file, table_definitions=table_definitions)
-    inserts_file.seek(0)
+        self.table_definitions = table_definitions
+        self.join_name = join_name
+        self.id_name = id_name
+        # a pair of table_name : last free id
+        self.id_cache: Dict[str, int] = {}
+        # a set of table names which tells us in a quick way
+        # whether we've already altered a table with id & join id
+        self.generated_keys_cache: AbstractSet[str] = set()
 
-    # generate create table queries
-    constraint_definitions = []
-    for table_name, columns in tables.items():
-        # create column parameters (column_name column_type [key])
-        column_definitions = []
-        for column_name in columns:
-            column_info = None
-            try:
-                column_info = table_definitions[table_name].get_column(column_name)
-            except (KeyError, AttributeError):
-                column_info = column.Column.create_default(column_name)
+        self.xmliter = xml.iterparse(filename, events=("start", "end"))
+        _, root = next(self.xmliter)
+        # a dict that holds all found tables and their columns
+        self.tables: Dict[str, AbstractSet[str]] = {}
+        for table_name, table_definition in table_definitions.items():
+            self.tables[table_name] = set(column_definition.column_name for column_definition in table_definition.column_definitions)
 
-            column_definitions.append(column_name + ' ' + str(column_info.data_type))
+        # generate insert queries in a temporary file
+        self.inserts_file = tempfile.TemporaryFile(mode='w+')
+        self.__parseNode(root, None)
+        self.inserts_file.seek(0)
 
-        # create constraints
-        if table_name in table_definitions:
-            for constraint in table_definitions[table_name].constraint_definitions:
-                if isinstance(constraint, column.UniqueIndex) or isinstance(constraint, column.Index):
-                    constraint_name = '_'.join(constraint.column_names) + '_index'
-                    unique_sql = 'UNIQUE' if isinstance(constraint, column.UniqueIndex) else ''
-                    constraint_definitions.append('CREATE {} INDEX {} ON {} ({})'.format(
-                        unique_sql,
-                        constraint_name,
-                        table_name,
-                        ','.join(constraint.column_names)))
-                elif isinstance(constraint, column.PrimaryKey):
-                    for i, definition in enumerate(column_definitions):
-                        if definition.startswith(constraint.column_name + ' '):
-                            column_definitions[i] = definition + ' PRIMARY KEY'
-                            break
+        # generate create table queries
+        constraint_definitions = []
+        for table_name, columns in self.tables.items():
+            table_definition = table_definitions.get(table_name, None)
 
-        outfile.write('CREATE TABLE {} ({});\n'.format(table_name, ','.join(column_definitions)))
+            # create column parameters (column_name column_type [key])
+            column_definitions = []
+            for column_name in columns:
+                column_info = None
+                try:
+                    column_info = table_definition.get_column(column_name)
+                except KeyError:
+                    column_info = column.Column.create_default(column_name)
 
-    # copy insert queries from temp file to out file
-    for line in inserts_file:
-        outfile.write(line)
+                column_definition = column_name + ' ' + str(column_info.data_type)
+                if column_info.foreign_key:
+                    column_definition = column_definition + ' REFERENCES {}({}) DEFERRABLE INITIALLY DEFERRED'.format(
+                        column_info.foreign_key.foreign_table_name,
+                        column_info.foreign_key.foreign_column_name
+                    )
+                column_definitions.append(column_definition)
 
-    # generate constraints
-    for constraint in constraint_definitions:
-        outfile.write(constraint + '\n')
+            # create constraints
+            if table_definition:
+                for constraint in table_definition.constraint_definitions:
+                    if isinstance(constraint, column.UniqueIndex) or isinstance(constraint, column.Index):
+                        constraint_name = '_'.join(constraint.column_names) + '_index'
+                        unique_sql = 'UNIQUE' if isinstance(constraint, column.UniqueIndex) else ''
+                        constraint_definitions.append('CREATE {} INDEX {} ON {} ({})'.format(
+                            unique_sql,
+                            constraint_name,
+                            table_name,
+                            ','.join(constraint.column_names)))
+                    elif isinstance(constraint, column.ForeignKey):
+                        for i, definition in enumerate(column_definitions):
+                            if definition.startswith(constraint.column_name + ' '):
+                                column_definitions[i] = definition + ' REFERENCES {}({}) DEFERRABLE INITIALLY DEFERRED'.format(
+                                    constraint.foreign_table_name,
+                                    constraint.foreign_column_name
+                                )
+                    elif isinstance(constraint, column.PrimaryKey):
+                        for i, definition in enumerate(column_definitions):
+                            if definition.startswith(constraint.column_name + ' '):
+                                column_definitions[i] = definition + ' PRIMARY KEY'
+                                break
 
-    inserts_file.close()
+            outfile.write('CREATE TABLE {} ({});\n'.format(table_name, ','.join(column_definitions)))
 
-def __parseNode(node, xmliter, tables, file, table_definitions=None, table_scope=None):
-    if table_scope is not None:
-        table_name = table_scope + node.tag.upper()
-        table_scope = table_name + '_'
+        # copy insert queries from temp file to out file
+        for line in self.inserts_file:
+            outfile.write(line)
 
-        column_values = []
-        for column_name, value in node.attrib.items():
-            try:
-                data_type = table_definitions[table_name].get_column(column_name).data_type
-            except (KeyError, AttributeError) as e:
-                data_type = column.Column.create_default(column_name).data_type
+        # generate constraints
+        for constraint in constraint_definitions:
+            outfile.write(constraint + '\n')
 
-            if isinstance(data_type, column.Text) or isinstance(data_type, column.Blob):
-                column_values.append("'" + value.replace("'", "''") + "'")
+        self.inserts_file.close()
+
+    def __parseNode(self, node, prev_node_attrib, table_scope=''):
+        attributes = node.attrib
+        if prev_node_attrib is not None:
+            table_name = table_scope + node.tag.upper()
+            table_definition = self.table_definitions.get(table_name, None)
+
+            # update attributes with joined ID and ID
+            if self.id_name and self.join_name:
+                if table_name not in self.id_cache:
+                    self.id_cache[table_name] = 1
+                attributes.update({ self.id_name: str(self.id_cache[table_name]) })
+                self.id_cache[table_name] = self.id_cache[table_name] + 1
+
+                if self.id_name in prev_node_attrib:
+                    attributes.update({ self.join_name: prev_node_attrib[self.id_name] })
+
+                # update table definition with ID and join ID columns if needed
+                if not table_definition:
+                    table_definition = table.Table(table_name)
+                    self.table_definitions[table_name] = table_definition
+                if table_name not in self.generated_keys_cache:
+                    self.generated_keys_cache.add(table_name)
+                    # generate an id column
+                    table_definition.column_definitions.append(column.Column(self.id_name, column.Integer()))
+                    table_definition.constraint_definitions.append(column.PrimaryKey(self.id_name))
+                    # generate a join column
+                    table_definition.column_definitions.append(column.Column(self.join_name, column.Integer(),
+                        column.ForeignKey(table_scope[:-1] + '.' + self.id_name)))
+
+            column_values = []
+            for column_name, value in node.attrib.items():
+                try:
+                    data_type = table_definition.get_column(column_name).data_type
+                except KeyError as e:
+                    data_type = column.Column.create_default(column_name).data_type
+
+                if isinstance(data_type, column.Text) or isinstance(data_type, column.Blob):
+                    column_values.append("'" + value.replace("'", "''") + "'")
+                else:
+                    column_values.append(value)
+
+            self.inserts_file.write('INSERT INTO {} ({}) VALUES ({});\n'.format(
+                table_name,
+                ','.join(node.attrib.keys()),
+                ','.join(column_values)
+            ))
+
+            # update table definitions
+            if not table_name in self.tables:
+                self.tables[table_name] = set(node.attrib.keys())
             else:
-                column_values.append(value)
+                self.tables[table_name].update(node.attrib.keys())
 
-        file.write('INSERT INTO {} ({}) VALUES ({});\n'.format(
-            table_name,
-            ','.join(node.attrib.keys()),
-            ','.join(column_values)
-        ))
+            table_scope = table_name + '_'
 
-        # update table definitions
-        if not table_name in tables:
-            tables[table_name] = set(node.attrib.keys())
-        else:
-            tables[table_name].update(node.attrib.keys())
-    else:
-        table_scope = ''
+        # parse child nodes
+        while True:
+            event, child_node = next(self.xmliter)
+            if event == 'end' and child_node.tag == node.tag:
+                break
+            else:
+                self.__parseNode(child_node, attributes, table_scope=table_scope)
 
-    # parse child nodes
-    while True:
-        event, child_node = next(xmliter)
-        if event == 'end' and child_node.tag == node.tag:
-            break
-        else:
-            __parseNode(child_node, xmliter, tables, file, table_definitions=table_definitions, table_scope=table_scope)
-
-    # prevent eating up too much memory
-    node.clear()
+        # prevent eating up too much memory
+        node.clear()
