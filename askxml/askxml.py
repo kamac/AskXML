@@ -36,7 +36,7 @@ class AskXML:
 
         self._sync_cursor = self._driver.create_cursor()
         try:
-            self._sync_file = open(self.filename + '_saved', 'w')
+            self._sync_file = open(self.filename, 'w')
             root_name, root_attrib = self._driver.get_xml_root()
             self._sync_file.write("<{tag}{properties}>\n".format(
                 tag=root_name,
@@ -61,7 +61,7 @@ class AskXML:
         filtered_properties = [p for p in properties if p[1] is not None and p[0] != self.join_name\
             and p[0] != self.id_name]
         if len(filtered_properties) > 0:
-            return ' ' + ' '.join('{}="{}"'.format(name, val.replace('"', '\\"')) for name, val in filtered_properties)
+            return ' ' + ' '.join('{}="{}"'.format(name, val.replace('"', '&quot;')) for name, val in filtered_properties)
         else:
             return ''
 

@@ -1,18 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
-<elements aaa='aaa'>
-    <tags name="tags container">
-      <tag name='app"le' />
-      <tag />
-      <tag name="kiwi" />
-    </tags>
-    <tags name="tags container no 2">
-      <tag name="kiwi 2" />
-    </tags>
-    <tags name="SELECT ME">
-      <tag name="juice" something="1" />
-      <tag name="candy" />
-    </tags>
-    <otherContainer>
-      <tag name="oui" />
-    </otherContainer>
+<elements aaa="aaa">
+  <tags name="tags container">
+    <tag name="app&quot;le" />
+    <tag />
+    <tag name="kiwi" />
+  </tags>
+  <tags name="tags container no 2">
+    <tag name="kiwi 2" />
+  </tags>
+  <tags name="SELECT ME">
+    <tag something="1" name="juice" />
+    <tag name="candy" />
+  </tags>
+  <otherContainer>
+    <tag name="oui" />
+  </otherContainer>
 </elements>

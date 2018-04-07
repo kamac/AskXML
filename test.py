@@ -4,7 +4,7 @@ from askxml import (AskXML, Integer, UniqueIndex, PrimaryKey, Table, Column,
 if __name__ == '__main__':
     table_definitions = [
         Table('tags_tag',
-            Column('Id', Integer()),
+            Column('newColumn', Integer()),
             UniqueIndex('name')
         )
     ]
