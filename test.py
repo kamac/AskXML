@@ -8,11 +8,11 @@ if __name__ == '__main__':
             UniqueIndex('name')
         )
     ]
-    conn = AskXML('test.xml', table_definitions=table_definitions)
+    conn = AskXML('test.xml', table_definitions=table_definitions, in_memory_db=True)
 
     c = conn.cursor()
 
-    c.execute("SELECT * FROM TAGS_TAG WHERE name LIKE 'kiwi%'")
+    c.execute("SELECT _id, name FROM TAGS_TAG WHERE name LIKE 'kiwi%'")
     for row in c.fetchall():
         print(row)
 

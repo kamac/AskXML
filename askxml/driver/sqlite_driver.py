@@ -15,21 +15,21 @@ class SqliteDriver(Driver):
     Sqlite Driver works by setting up a .sqlite copy of XML document,
     and then running statements on it.
     """
-    # Name of the column that stores parent's ID
-    join_name = '_parentId'
-    # Name of the column that stores node's ID
-    id_name = '_id'
 
-    def __init__(self, filename: str, table_definitions, in_memory_db: bool = False):
+    def __init__(self, filename: str, table_definitions, join_name: str, id_name: str,
+        in_memory_db: bool = False):
         """
         :param filename: Path to .xml file to open
         :param table_definitions: A dict of table name as keys table definitions as values
         :param in_memory_db: If set to True, sqlite's database will be stored in RAM rather than as
             a temporary file on disk.
+        :param join_name: Name of the column that stores parent's ID
+        :param id_name: Name of the column that stores node's ID
         """
         sql_file = tempfile.TemporaryFile(mode='w+')
-        converter = Converter(filename, sql_file, table_definitions=dict((table.table_name, table,) for table in table_definitions),
-            join_name=self.join_name, id_name=self.id_name)
+        converter = Converter(filename, sql_file,
+            table_definitions=dict((table.table_name, table,) for table in table_definitions),
+            join_name=join_name, id_name=id_name)
         self._table_hierarchy = converter._table_hierarchy
         sql_file.seek(0)
 
@@ -43,7 +43,6 @@ class SqliteDriver(Driver):
         # fill database with data
         cursor = self._conn.cursor()
         for query in sql_file:
-            print(query)
             cursor.execute(query)
         cursor.close()
         self._conn.commit()

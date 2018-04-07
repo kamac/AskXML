@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic
+from typing import List, Dict
 
 class Driver(ABC):
     def __init__(self, filename: str, table_definitions):
@@ -7,15 +7,16 @@ class Driver(ABC):
 
     @property
     @abstractmethod
-    def table_hierarchy(self) -> dict:
+    def table_hierarchy(self) -> Dict[str, dict]:
         """
         Returns table structure. Example:
-        "BASKET": {
+        {"BASKET": {
             "APPLE": {},
             "BOX": {
                 "ORANGE": {}
             }
-        }
+        },
+        "BALL": {}}
         """
         pass
 
