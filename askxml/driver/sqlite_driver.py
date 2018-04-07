@@ -84,7 +84,7 @@ class Converter:
         Converts an XML file to a .sqlite script
 
         :param filename: Path to .xml file to open
-        :param outfile: File handle where resulting .sql will be stored
+        :param outfile: File handle to where resulting .sql will be stored
         :param table_definitions: A dict of table name as keys table definitions as values
         :param join_name: Name of the column that stores parent's ID. Set to None to not join.
         :param id_name: Name of the column that stores node's ID. Set to None to not generate an ID.
