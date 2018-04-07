@@ -1,22 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Tuple
 
 class Driver(ABC):
     def __init__(self, filename: str, table_definitions):
         pass
 
-    @property
     @abstractmethod
-    def table_hierarchy(self) -> Dict[str, dict]:
+    def get_xml_root(self):
+        pass
+
+    @abstractmethod
+    def get_tables(self) -> Tuple[List[str], List[str]]:
         """
-        Returns table structure. Example:
-        {"BASKET": {
-            "APPLE": {},
-            "BOX": {
-                "ORANGE": {}
-            }
-        },
-        "BALL": {}}
+        Returns a tuple of (root table names, child table names)
         """
         pass
 

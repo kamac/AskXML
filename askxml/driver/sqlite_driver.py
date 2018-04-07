@@ -1,4 +1,4 @@
-from typing import Dict, AbstractSet, List
+from typing import Dict, AbstractSet, List, Tuple
 from abc import abstractmethod
 from askxml import column, table
 from .driver import Driver
@@ -26,11 +26,12 @@ class SqliteDriver(Driver):
         :param join_name: Name of the column that stores parent's ID
         :param id_name: Name of the column that stores node's ID
         """
+        self.join_name = join_name
+        self.id_name = id_name
         sql_file = tempfile.TemporaryFile(mode='w+')
-        converter = Converter(filename, sql_file,
+        self.__converter = Converter(filename, sql_file,
             table_definitions=dict((table.table_name, table,) for table in table_definitions),
             join_name=join_name, id_name=id_name)
-        self._table_hierarchy = converter._table_hierarchy
         sql_file.seek(0)
 
         if not in_memory_db:
@@ -48,9 +49,25 @@ class SqliteDriver(Driver):
         self._conn.commit()
         sql_file.close()
 
-    @property
-    def table_hierarchy(self) -> str:
-        return self._table_hierarchy
+    def get_xml_root(self):
+        return self.__converter.root_name, self.__converter.root_attrib
+
+    def get_tables(self) -> Tuple[List[str], List[str]]:
+        cursor = self.create_cursor()
+        try:
+            root_tables = []
+            child_tables = []
+            tables = cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            for table_name in tables.fetchall():
+                columns = cursor.execute("PRAGMA table_info('{}')".format(table_name[0])).fetchall()
+                columns = [c[1] for c in columns]
+                if self.join_name not in columns:
+                    root_tables.append(table_name[0])
+                else:
+                    child_tables.append(table_name[0])
+            return root_tables, child_tables
+        finally:
+            cursor.close()
 
     def create_cursor(self):
         return self._conn.cursor()
@@ -83,10 +100,11 @@ class Converter:
         # a set of table names which tells us in a quick way
         # whether we've already altered a table with id & join id
         self._generated_keys_cache: AbstractSet[str] = set()
-        self._table_hierarchy = {}
 
         self.xmliter = xml.iterparse(filename, events=("start", "end"))
         _, root = next(self.xmliter)
+        self.root_name = root.tag
+        self.root_attrib = root.attrib
         # a dict that holds all found tables and their columns
         self.tables: Dict[str, AbstractSet[str]] = {}
         for table_name, table_definition in table_definitions.items():
@@ -97,7 +115,7 @@ class Converter:
         self.__parseNode(root, None)
         self.inserts_file.seek(0)
 
-        # generate create table queries
+        # generate create table statements
         constraint_definitions = []
         for table_name, columns in self.tables.items():
             table_definition = table_definitions.get(table_name, None)
@@ -158,7 +176,7 @@ class Converter:
     def __parseNode(self, node, prev_node_attrib, table_scope=''):
         attributes = node.attrib
         if prev_node_attrib is not None:
-            table_name = table_scope + node.tag.upper()
+            table_name = table_scope + node.tag
             table_definition = self.table_definitions.get(table_name, None)
 
             # update attributes with joined ID and ID
@@ -169,7 +187,7 @@ class Converter:
                 self.id_cache[table_name] = self.id_cache[table_name] + 1
 
                 if self.id_name in prev_node_attrib:
-                    attributes.update({ self.join_name: prev_node_attrib[self.id_name] })
+                    attributes.update({self.join_name: prev_node_attrib[self.id_name]})
 
                 # update table definition with ID and join ID columns if needed
                 if not table_definition:
@@ -180,19 +198,9 @@ class Converter:
                     # generate an id column
                     table_definition.column_definitions.append(column.Column(self.id_name, column.Integer()))
                     table_definition.constraint_definitions.append(column.PrimaryKey(self.id_name))
-                    # generate a join column
+                    # generate a join ID column
                     table_definition.column_definitions.append(column.Column(self.join_name, column.Integer(),
                         column.ForeignKey(table_scope[:-1] + '.' + self.id_name)))
-
-                    if not table_scope:
-                        # this is a root table
-                        self._table_hierarchy[table_name] = {}
-                    else:
-                        table_path = table_name.split('_')
-                        last_item = None
-                        for tname in table_path[:-1]:
-                            last_item = self._table_hierarchy[tname]
-                        last_item[table_path[-1]] = {}
 
             column_values = []
             for column_name, value in node.attrib.items():

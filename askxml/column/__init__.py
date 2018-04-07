@@ -7,6 +7,11 @@ class Column:
     """
 
     def __init__(self, column_name: str, data_type: DataType, foreign_key: ForeignKey = None):
+        """
+        :param column_name: Name of SQL column
+        :param data_type: Data type stored in column
+        :param foreign_key: A foreign key constraint
+        """
         self._column_name = column_name
         self._data_type = data_type
         if foreign_key:

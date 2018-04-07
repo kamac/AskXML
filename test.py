@@ -3,7 +3,7 @@ from askxml import (AskXML, Integer, UniqueIndex, PrimaryKey, Table, Column,
 
 if __name__ == '__main__':
     table_definitions = [
-        Table('TAGS_TAG',
+        Table('tags_tag',
             Column('Id', Integer()),
             UniqueIndex('name')
         )
@@ -12,15 +12,20 @@ if __name__ == '__main__':
 
     c = conn.cursor()
 
-    c.execute("SELECT _id, name FROM TAGS_TAG WHERE name LIKE 'kiwi%'")
+    print("select all tags whose name begin with kiwi")
+    c.execute("SELECT _id, name FROM tags_tag WHERE name LIKE 'kiwi%'")
     for row in c.fetchall():
         print(row)
 
-    c.execute("""SELECT tag.name FROM TAGS_TAG AS tag
-        INNER JOIN TAGS AS parent ON parent._id = tag._parentId
+    print("select all tags under tag with specified name")
+    c.execute("""SELECT tag.name FROM tags_tag AS tag
+        INNER JOIN tags AS parent ON parent._id = tag._parentId
         WHERE parent.name = 'SELECT ME'""")
     for row in c.fetchall():
         print(row)
+
+    print("insert a new tag into otherContainer")
+    c.execute("INSERT INTO otherContainer_tag (_parentId, name) VALUES (1, 'oink')")
 
     c.close()
     conn.close()
