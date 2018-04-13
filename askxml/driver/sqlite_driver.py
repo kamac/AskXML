@@ -16,10 +16,10 @@ class SqliteDriver(Driver):
     and then running statements on it.
     """
 
-    def __init__(self, filename: str, table_definitions, join_name: str, id_name: str,
+    def __init__(self, source, table_definitions, join_name: str, id_name: str,
         in_memory_db: bool = False):
         """
-        :param filename: Path to .xml file to open
+        :param source: Path to .xml file to open, or file handle
         :param table_definitions: A dict of table name as keys table definitions as values
         :param in_memory_db: If set to True, sqlite's database will be stored in RAM rather than as
             a temporary file on disk.
@@ -29,8 +29,13 @@ class SqliteDriver(Driver):
         self.join_name = join_name
         self.id_name = id_name
         sql_file = tempfile.TemporaryFile(mode='w+')
-        self.__converter = Converter(filename, sql_file,
-            table_definitions=dict((table.table_name, table,) for table in table_definitions),
+        if table_definitions:
+            # convert table definitions from a list of tables into a dict
+            # where key is table name and value is a Table object
+            dict((table.table_name, table,) for table in table_definitions)
+
+        self.__converter = Converter(source, sql_file,
+            table_definitions=table_definitions,
             join_name=join_name, id_name=id_name)
         sql_file.seek(0)
 
@@ -78,12 +83,12 @@ class SqliteDriver(Driver):
             os.remove(self.db_path)
 
 class Converter:
-    def __init__(self, filename: str, outfile, table_definitions: Dict[str, table.Table] = None,
+    def __init__(self, source, outfile, table_definitions: Dict[str, table.Table] = None,
         join_name: str = None, id_name: str = None):
         """
         Converts an XML file to a .sqlite script
 
-        :param filename: Path to .xml file to open
+        :param source: Path to .xml file to open, or file handle
         :param outfile: File handle to where resulting .sql will be stored
         :param table_definitions: A dict of table name as keys table definitions as values
         :param join_name: Name of the column that stores parent's ID. Set to None to not join.
@@ -101,7 +106,7 @@ class Converter:
         # whether we've already altered a table with id & join id
         self._generated_keys_cache: AbstractSet[str] = set()
 
-        self.xmliter = xml.iterparse(filename, events=("start", "end"))
+        self.xmliter = xml.iterparse(source, events=("start", "end"))
         _, root = next(self.xmliter)
         self.root_name = root.tag
         self.root_attrib = root.attrib

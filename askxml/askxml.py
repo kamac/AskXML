@@ -5,11 +5,11 @@ import tempfile
 import os
 
 class AskXML:
-    def __init__(self, filename: str, table_definitions: List[Table] = None,
+    def __init__(self, source, table_definitions: List[Table] = None,
             persist_data: bool = True, driver = 'sqlite', join_name='_parentId', id_name='_id',
             serialize_ident: str = '  ', *args, **kwargs):
         """
-        :param filename: Path to .xml file to open
+        :param source: Path to .xml file to open, or file handle
         :param table_definitions: A list of table definitions
         :param persist_data: If enabled, changes to data will be saved to source XML file
         :param driver: Driver used to implement sql functionality. Can be a string or an object implementing Driver
