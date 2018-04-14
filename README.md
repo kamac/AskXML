@@ -28,12 +28,9 @@ Run SQL statements on XML documents
 
 ## BUT WHY?
 
-1. There are data dumps like stack exchange's, stored in XML. They're big, so fitting them whole into memory is not desired.
-With AskXML you can query things fast, and rather comfortably (provided you know SQL).
+There are data dumps like stack exchange's, stored in XML. They're big, so fitting them whole into memory is not desired. With AskXML you can query things fast, and rather comfortably (provided you know SQL).
 
-2. FOR FUN. (run SQL on all the things!)
-
-Before you go ANY further though, it's very possible your task can be achieved with XPATH and ElementTree XML API, so give that a look if you haven't heard of it.
+Before you go any further though, it's very possible your task can be achieved with XPATH and ElementTree XML API, so give that a look if you haven't heard of it.
 
 ## Installation
 
@@ -63,7 +60,7 @@ You don't need to define all existing columns or tables. If a definition was not
 
 #### Node hierarchy
 
-If you want to find nodes that are children of another node by name, you can do it like that:
+If you want to find nodes that are children of another node by name:
 
 ```xml
 
@@ -94,7 +91,7 @@ This will print `[('Morty'), ('Summer')]`.
 
 #### Inserting new data
 
-If you want to add a new tag, you can do it like this:
+If you want to add a new tag:
 
 ```python
 cursor.execute("INSERT INTO fruit (color, _text) VALUES ('red', 'strawberry')")
