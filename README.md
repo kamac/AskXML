@@ -60,7 +60,7 @@ You don't need to define all existing columns or tables. If a definition was not
 
 #### Node hierarchy
 
-If you want to find nodes that are children of another node by name:
+If you want to find nodes that are children of another node by attribute:
 
 ```xml
 
