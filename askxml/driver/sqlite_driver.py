@@ -19,7 +19,7 @@ class SqliteDriver(Driver):
     and then running statements on it.
     """
 
-    def __init__(self, source, table_definitions = None, join_name: str = '_joinId', id_name: str = '_id',
+    def __init__(self, source, table_definitions = None, join_name: str = '_parentId', id_name: str = '_id',
         text_name: str = '_text', in_memory_db: bool = False):
         """
         :param source: Path to .xml file to open, or file handle

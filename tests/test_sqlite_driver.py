@@ -53,7 +53,7 @@ class TestSqliteDriver(unittest.TestCase):
             self.assertEqual(len(child_tables), 0)
             driver.close()
 
-    def test_get_attributes(self):
+    def test_tables_have_attributes(self):
         with tempfile.SpooledTemporaryFile(mode='w+') as f:
             f.write(_xml_file_simple)
             f.seek(0)
@@ -70,7 +70,7 @@ class TestSqliteDriver(unittest.TestCase):
             cursor.close()
             driver.close()
 
-    def test_attribute_types(self):
+    def test_attributes_have_correct_types(self):
         with tempfile.SpooledTemporaryFile(mode='w+') as f:
             f.write(_xml_file_simple)
             f.seek(0)
@@ -83,7 +83,7 @@ class TestSqliteDriver(unittest.TestCase):
             cursor.close()
             driver.close()
 
-    def test_node_text(self):
+    def test_tables_have_text(self):
         with tempfile.SpooledTemporaryFile(mode='w+') as f:
             f.write(_xml_file_simple)
             f.seek(0)
@@ -93,6 +93,21 @@ class TestSqliteDriver(unittest.TestCase):
             self.assertEqual(len(result), 2)
             self.assertEqual(result[0][0], 'Hello')
             self.assertEqual(result[1][0], None)
+            cursor.close()
+            driver.close()
+
+    def test_tables_are_joining(self):
+        with tempfile.SpooledTemporaryFile(mode='w+') as f:
+            f.write(_xml_file_simple)
+            f.seek(0)
+            driver = SqliteDriver(source=f)
+            cursor = driver.create_cursor()
+            result = cursor.execute("""SELECT (SELECT COUNT(*) FROM RootTable_Child AS c WHERE c._parentId = r._id)
+                                    FROM RootTable AS r
+                                    ORDER BY r._id ASC""").fetchall()
+            self.assertEqual(len(result), 2)
+            self.assertEqual(result[0][0], 2)
+            self.assertEqual(result[1][0], 0)
             cursor.close()
             driver.close()
 
