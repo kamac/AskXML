@@ -6,15 +6,13 @@ import os
 
 class AskXML:
     def __init__(self, source, table_definitions: List[Table] = None,
-            persist_data: bool = True, driver = 'sqlite', join_name='_parentId', id_name='_id',
-            serialize_ident: str = '  ', *args, **kwargs):
+            persist_data: bool = True, driver = 'sqlite', serialize_ident: str = '  ',
+            *args, **kwargs):
         """
         :param source: Path to .xml file to open, or file handle
         :param table_definitions: A list of table definitions
         :param persist_data: If enabled, changes to data will be saved to source XML file
         :param driver: Driver used to implement sql functionality. Can be a string or an object implementing Driver
-        :param join_name: Name of the column that stores parent's ID
-        :param id_name: Name of the column that stores node's ID
         :param serialize_ident: Identation to use when serializing data to XML
         """
         self.persist_data = persist_data
@@ -25,7 +23,7 @@ class AskXML:
         if not hasattr(driver, '__call__'):
             driver = getattr(import_module('askxml.driver.' + driver + '_driver'), driver.capitalize() + 'Driver')
 
-        self._driver = driver(filename, table_definitions, join_name=join_name, id_name=id_name, *args, **kwargs)
+        self._driver = driver(filename, table_definitions, *args, **kwargs)
 
     def synchronize(self):
         """
