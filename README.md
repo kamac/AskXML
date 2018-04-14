@@ -107,4 +107,4 @@ cursor.execute("INSERT INTO someParent_someChild (name, _parentId) VALUES ('a ba
 
 ## License
 
-AskXML is licensed under [MIT license](https://github.com/kamac/AskXML/blob/blob/master/LICENSE)
+AskXML is licensed under [MIT license](https://github.com/kamac/AskXML/blob/master/LICENSE)
