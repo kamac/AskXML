@@ -3,8 +3,8 @@ from .column import *
 class Table:
     def __init__(self, table_name: str, *args):
         """
-        :param table_name: Uppercased XML tag preceded with uppercased parent tags separated by underscore.
-            eg. PARENT_CHILD_CHILD
+        :param table_name: XML tag preceded with parent tags separated by underscore.
+            eg. Parent_Child_Child
         :param *args: A list of column and constraint definitions
         """
         self._table_name = table_name
