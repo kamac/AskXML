@@ -105,6 +105,10 @@ Or if your nodes have a hierarchy:
 cursor.execute("INSERT INTO someParent_someChild (name, _parentId) VALUES ('a baby', 1)")
 ```
 
+## Contributing
+
+Any contributions are welcome.
+
 ## License
 
 AskXML is licensed under [MIT license](https://github.com/kamac/AskXML/blob/master/LICENSE)
